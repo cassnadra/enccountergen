@@ -16,6 +16,9 @@ folder as enccountergen and input the file name when prompted. the resulting
 folder will contain all the files for your encounter counter animation as well 
 as a prepared zip you can import as a mod.
 
+includes automatic gif cropping/scaling, as well as speedup/slowdown. 
+also supports normal image types
+
 
 
 
