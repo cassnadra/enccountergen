@@ -67,11 +67,43 @@ def generate_custom_counter():
                     except ValueError:
                         print("Invalid number. Please enter an arbitrary value between 0 and 100 (e.g., 15, 62.5, 80).")
 
+        # Check if it's an animated image to determine if timing adjustments apply
+        is_animated = getattr(img, "is_animated", False)
+        speed_multiplier = 100.0 # Default 100% (normal speed)
+
+        if is_animated:
+            print("\nAnimation detected. How would you like to handle frame timing?")
+            print("1. Play at normal speed (pulled from the GIF)")
+            print("2. Change the speed by an arbitrary %")
+            while True:
+                timing_choice = input("Enter choice (1 or 2): ").strip()
+                if timing_choice in ['1', '2']:
+                    break
+                print("Invalid choice. Please enter 1 or 2.")
+            
+            if timing_choice == '2':
+                while True:
+                    try:
+                        speed_input = input("Enter speed % (e.g., 50 = half speed, 200 = double speed): ").strip()
+                        speed_multiplier = float(speed_input)
+                        if speed_multiplier > 0:
+                            break
+                        print("Speed percentage must be greater than 0.")
+                    except ValueError:
+                        print("Invalid number. Please enter a valid percentage.")
+
         while True:
-            # Determine duration
+            # Determine original duration (default to 100ms if missing or 0)
             duration = img.info.get("duration", 100)
             if duration == 0:
                 duration = 100
+            
+            # Apply speed alteration if applicable
+            # (Duration is inversely proportional to speed: 200% speed = 50% original duration)
+            if is_animated and speed_multiplier != 100.0:
+                duration = int(duration * (100.0 / speed_multiplier))
+                if duration < 10:  # Enforce minimum lower bound for safety
+                    duration = 10
             
             # Extract current frame
             current_frame = img.copy()
@@ -208,12 +240,9 @@ def generate_custom_counter():
     # --- Package into .zip inside the output folder ---
     print("\nPackaging files into PokeMMO theme zip format...")
     
-    # We build the zip into a temporary file path first, then move it in
-    # to avoid the archiver accidentally trying to add its own zip file into itself.
     temp_zip_path = os.path.join(output_root, f"temp_{animation_folder_name}")
     shutil.make_archive(temp_zip_path, 'zip', animation_root_dir)
     
-    # Move the completed zip directly into the root folder
     final_zip_destination = os.path.join(animation_root_dir, f"{base_name}.zip")
     shutil.move(f"{temp_zip_path}.zip", final_zip_destination)
 
