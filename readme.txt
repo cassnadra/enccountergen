@@ -11,9 +11,10 @@
 
 
 
-simple encounter counter maker i vibecoded in 5 seconds, put a gif into the same folder as enccountergen and
-input the file name when prompted. the resulting folder will contain all the files for your encounter counter 
-animation as well as a prepared zip you can import as a mod.
+simple encounter counter maker i vibecoded in 5 seconds, put a gif into the same 
+folder as enccountergen and input the file name when prompted. the resulting 
+folder will contain all the files for your encounter counter animation as well 
+as a prepared zip you can import as a mod.
 
 
 
