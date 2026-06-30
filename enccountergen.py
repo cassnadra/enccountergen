@@ -1,26 +1,20 @@
 import os
+import shutil
 from datetime import datetime
 from PIL import Image
 
 def generate_custom_counter():
-    # Prompt the user for the file path directly in the console
-    image_path = input("Enter the path to your GIF or image file: ").strip()
-    
-    # Strip quotes if the user dragged and dropped the file into the terminal
-    image_path = image_path.strip("'\"")
+    image_path = input("Enter the path to your GIF or image file: ").strip().strip("'\"")
 
     if not os.path.exists(image_path):
         print(f"Error: File '{image_path}' not found. Please check the path and try again.")
         return
 
     output_root = "output"
-
-    # Extract naming details
     base_name = os.path.splitext(os.path.basename(image_path))[0]
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     animation_folder_name = f"{base_name}_{timestamp}"
     
-    # Define paths
     animation_root_dir = os.path.join(output_root, animation_folder_name)
     data_dir = os.path.join(animation_root_dir, "data")
     anim_dir = os.path.join(data_dir, "anim")
@@ -31,28 +25,100 @@ def generate_custom_counter():
         frames_data = []
         frame_idx = 0
         
-        # Save the very first frame as icon.png in the animation root directory
-        icon_path = os.path.join(animation_root_dir, "icon.png")
-        img.seek(0)
-        icon_img = img.convert("RGB")
-        icon_img.save(icon_path, "PNG")
+        # Check if resizing is needed globally
+        orig_w, orig_h = img.size
+        needs_resize = (orig_w != 300 or orig_h != 250)
         
+        choice = '1'
+        crop_pct = 50.0  # Default to 50% (center)
+        
+        if needs_resize:
+            print(f"\nYour image is {orig_w}x{orig_h}. It needs to be normalized to 300x250.")
+            print("How would you like to handle the aspect ratio difference?")
+            print("1. Cut (Scale and customize crop position)")
+            print("2. Stretch (Force resize directly to 300x250)")
+            while True:
+                choice = input("Enter choice (1 or 2): ").strip()
+                if choice in ['1', '2']:
+                    break
+                print("Invalid choice. Please enter 1 or 2.")
+            
+            if choice == '1':
+                # Calculate aspect ratios to see which side has excess pixels
+                orig_aspect = orig_w / orig_h
+                target_aspect = 300 / 250
+                
+                if orig_aspect > target_aspect:
+                    # Too wide
+                    print("\nAfter scaling to match height, the image is too WIDE.")
+                    prompt_msg = "What % from the LEFT side would you like to cut off? (0% = stick to left edge, 50% = center, 100% = stick to right edge): "
+                else:
+                    # Too tall
+                    print("\nAfter scaling to match width, the image is too TALL.")
+                    prompt_msg = "What % from the TOP would you like to cut off? (0% = stick to top edge, 50% = center, 100% = stick to bottom edge): "
+                
+                while True:
+                    try:
+                        pct_input = input(prompt_msg).strip()
+                        crop_pct = float(pct_input)
+                        if 0.0 <= crop_pct <= 100.0:
+                            break
+                        print("Please enter a percentage between 0 and 100.")
+                    except ValueError:
+                        print("Invalid number. Please enter an arbitrary value between 0 and 100 (e.g., 15, 62.5, 80).")
+
         while True:
-            # Determine duration (default to 100ms if not specified)
+            # Determine duration
             duration = img.info.get("duration", 100)
             if duration == 0:
                 duration = 100
             
-            # Format filename matching your structure
+            # Extract current frame
+            current_frame = img.copy()
+            
+            # Apply chosen resize mechanics
+            if needs_resize:
+                if choice == '2':
+                    current_frame = current_frame.resize((300, 250), Image.Resampling.LANCZOS)
+                else:
+                    orig_aspect = orig_w / orig_h
+                    if orig_aspect > (300 / 250):
+                        # Too wide: match target height and calculate wide scaled width
+                        new_h = 250
+                        new_w = int(orig_w * (250 / orig_h))
+                        current_frame = current_frame.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                        
+                        # Calculate available excess space to shift crop window based on custom %
+                        excess_width = new_w - 300
+                        left = int(excess_width * (crop_pct / 100.0))
+                        top = 0
+                    else:
+                        # Too tall: match target width and calculate tall scaled height
+                        new_w = 300
+                        new_h = int(orig_h * (300 / orig_w))
+                        current_frame = current_frame.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                        
+                        # Calculate available excess space to shift crop window based on custom %
+                        excess_height = new_h - 250
+                        left = 0
+                        top = int(excess_height * (crop_pct / 100.0))
+                    
+                    current_frame = current_frame.crop((left, top, left + 300, top + 250))
+
+            # Save the very first processed frame as icon.png
+            if frame_idx == 0:
+                icon_path = os.path.join(animation_root_dir, "icon.png")
+                icon_img = current_frame.convert("RGB")
+                icon_img.save(icon_path, "PNG")
+            
+            # Format and save frame asset
             delay_sec = duration / 1000.0
             frame_filename = f"frame_{frame_idx:02d}_delay-{delay_sec:.1f}s.jpg"
             frame_filepath = os.path.join(anim_dir, frame_filename)
             
-            # Convert to RGB and save as JPG
-            rgb_img = img.convert("RGB")
+            rgb_img = current_frame.convert("RGB")
             rgb_img.save(frame_filepath, "JPEG")
             
-            # Store metadata for XML generation
             area_name = f"bg-f{frame_idx+1:05d}"
             frames_data.append({
                 "file": f"anim/{frame_filename}",
@@ -64,7 +130,7 @@ def generate_custom_counter():
             try:
                 img.seek(frame_idx)
             except EOFError:
-                break # End of GIF frames
+                break
 
     # --- Generate custom-counter.xml Content ---
     custom_counter_lines = [
@@ -135,19 +201,19 @@ def generate_custom_counter():
   </theme_extensions>
 </resource>"""
 
-    # Write out info.xml to the root of the animation folder
     info_xml_path = os.path.join(animation_root_dir, "info.xml")
     with open(info_xml_path, "w", encoding="utf-8") as xml_file:
         xml_file.write(info_xml_content)
 
+    # --- Package into .zip for PokeMMO ---
+    print("\nPackaging files into PokeMMO theme zip format...")
+    zip_output_base = os.path.join(output_root, animation_folder_name)
+    shutil.make_archive(zip_output_base, 'zip', animation_root_dir)
+
     print("\n--- Processing Complete ---")
     print(f"Processed {frame_idx} frames successfully.")
     print(f"Directory Created: {animation_root_dir}/")
-    print(f"├── icon.png")
-    print(f"├── info.xml")
-    print(f"└── data/")
-    print(f"    ├── custom-counter.xml")
-    print(f"    └── anim/ (Contains {frame_idx} extracted frames)")
+    print(f"PokeMMO Ready Zip: {zip_output_base}.zip")
 
 if __name__ == "__main__":
     generate_custom_counter()
