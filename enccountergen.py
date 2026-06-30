@@ -205,15 +205,22 @@ def generate_custom_counter():
     with open(info_xml_path, "w", encoding="utf-8") as xml_file:
         xml_file.write(info_xml_content)
 
-    # --- Package into .zip for PokeMMO ---
+    # --- Package into .zip inside the output folder ---
     print("\nPackaging files into PokeMMO theme zip format...")
-    zip_output_base = os.path.join(output_root, animation_folder_name)
-    shutil.make_archive(zip_output_base, 'zip', animation_root_dir)
+    
+    # We build the zip into a temporary file path first, then move it in
+    # to avoid the archiver accidentally trying to add its own zip file into itself.
+    temp_zip_path = os.path.join(output_root, f"temp_{animation_folder_name}")
+    shutil.make_archive(temp_zip_path, 'zip', animation_root_dir)
+    
+    # Move the completed zip directly into the root folder
+    final_zip_destination = os.path.join(animation_root_dir, f"{base_name}.zip")
+    shutil.move(f"{temp_zip_path}.zip", final_zip_destination)
 
     print("\n--- Processing Complete ---")
     print(f"Processed {frame_idx} frames successfully.")
     print(f"Directory Created: {animation_root_dir}/")
-    print(f"PokeMMO Ready Zip: {zip_output_base}.zip")
+    print(f"PokeMMO Ready Zip saved inside directory: \n -> {final_zip_destination}")
 
 if __name__ == "__main__":
     generate_custom_counter()
