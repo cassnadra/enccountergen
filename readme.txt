@@ -12,10 +12,8 @@
 
 
 simple encounter counter maker i vibecoded in 5 seconds, put a gif into the same folder as enccountergen and
-input the file name when prompted. the resulting folder will then have to be put into a zip file. make sure to
-only zip the CONTENTS of the folder, not the actual output folder itself. the root of your zip file MUST be where
-the data folder, icon, and info.xml are stored.
-
+input the file name when prompted. the resulting folder will contain all the files for your encounter counter 
+animation as well as a prepared zip you can import as a mod.
 
 
 
