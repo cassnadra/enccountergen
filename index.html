@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Encounter Counter Generator</title>
+    <!-- External Libraries via CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gifuct-js@2.1.2/dist/gifuct-js.min.js"></script>
+
     <style>
         :root {
             --primary: #4F46E5;
@@ -37,91 +41,55 @@
             max-width: 500px;
         }
 
-        h1 {
-            margin-top: 0;
-            font-size: 1.5rem;
-            color: var(--text-main);
-            text-align: center;
-            margin-bottom: 25px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 8px;
-            font-size: 0.9rem;
-        }
-
-        .help-text {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-top: -4px;
-            margin-bottom: 8px;
-            display: block;
-        }
-
+        h1 { margin-top: 0; font-size: 1.5rem; text-align: center; margin-bottom: 25px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 0.9rem; }
+        .help-text { font-size: 0.8rem; color: var(--text-muted); margin-top: -4px; margin-bottom: 8px; display: block; }
         input[type="file"], select, input[type="number"], input[type="range"] {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius);
-            font-size: 1rem;
-            box-sizing: border-box;
+            width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius); font-size: 1rem; box-sizing: border-box;
         }
-
-        input[type="range"] {
-            padding: 0;
-        }
-
-        .range-value {
-            text-align: center;
-            font-weight: bold;
-            margin-top: 5px;
-            font-size: 0.9rem;
-            color: var(--primary);
-        }
-
-        .hidden {
-            display: none !important;
-        }
+        input[type="range"] { padding: 0; }
+        .range-value { text-align: center; font-weight: bold; margin-top: 5px; font-size: 0.9rem; color: var(--primary); }
+        .hidden { display: none !important; }
 
         button {
-            width: 100%;
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            padding: 12px;
-            font-size: 1rem;
-            font-weight: bold;
-            border-radius: var(--radius);
-            cursor: pointer;
-            transition: background-color 0.2s;
-            margin-top: 10px;
+            width: 100%; background-color: var(--primary); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s; margin-top: 10px;
         }
+        button:hover { background-color: var(--primary-hover); }
+        button:disabled { background-color: #9CA3AF; cursor: not-allowed; }
 
-        button:hover {
-            background-color: var(--primary-hover);
+        /* Preview Box */
+        .preview-wrapper { display: flex; justify-content: center; margin-bottom: 20px; background: #e5e7eb; padding: 10px; border-radius: var(--radius); }
+        .preview-container { width: 300px; height: 250px; background-color: #d1d5db; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        #previewImage { width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; display: none; }
+        
+        #loadingOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; font-weight: bold; font-size: 1.2rem;
         }
     </style>
 </head>
 <body>
 
+<div id="loadingOverlay" class="hidden">
+    <div>Processing frames...</div>
+    <div id="loadingSubtext" style="font-size: 0.9rem; color: #666; margin-top: 10px;">This may take a moment for large GIFs.</div>
+</div>
+
 <div class="container">
     <h1>Encounter Counter Generator</h1>
     
+    <div class="preview-wrapper hidden" id="previewWrapper">
+        <div class="preview-container">
+            <img id="previewImage" alt="Image Preview">
+        </div>
+    </div>
+
     <form id="generatorForm">
-        <!-- File Upload -->
         <div class="form-group">
             <label for="imageFile">Upload GIF or Image</label>
-            <span class="help-text">Image will be normalized to 300x250.</span>
             <input type="file" id="imageFile" accept="image/png, image/jpeg, image/gif" required>
         </div>
 
-        <!-- Resize Handling -->
         <div class="form-group" id="resizeGroup">
             <label for="resizeMode">Resize Method</label>
             <select id="resizeMode">
@@ -130,18 +98,14 @@
             </select>
         </div>
 
-        <!-- Crop Percentage (Hidden if Stretch is selected) -->
         <div class="form-group" id="cropGroup">
-            <label for="cropPct">Crop Position (%)</label>
-            <span class="help-text">0 = Left/Top edge, 50 = Center, 100 = Right/Bottom edge.</span>
+            <label id="cropLabel" for="cropPct">Crop Position (%)</label>
             <input type="range" id="cropPct" min="0" max="100" value="50" step="0.5">
             <div class="range-value" id="cropValueDisplay">50%</div>
         </div>
 
-        <!-- Animation Section (Hidden unless GIF is uploaded) -->
         <div id="animationSection" class="hidden">
             <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 20px 0;">
-            
             <div class="form-group">
                 <label for="timingChoice">Frame Timing (Animation Speed)</label>
                 <select id="timingChoice">
@@ -149,104 +113,321 @@
                     <option value="2">Change speed by arbitrary %</option>
                 </select>
             </div>
-
-            <!-- Custom Speed (Hidden unless "Change speed" is selected) -->
             <div class="form-group hidden" id="speedGroup">
                 <label for="speedMultiplier">Speed Percentage (%)</label>
-                <span class="help-text">e.g., 50 = half speed, 200 = double speed.</span>
                 <input type="number" id="speedMultiplier" value="100" min="1" step="1">
             </div>
         </div>
 
-        <button type="submit">Generate Theme</button>
+        <button type="submit" id="submitBtn">Generate Theme</button>
     </form>
 </div>
 
 <script>
-    // DOM Elements
-    const imageFileInput = document.getElementById('imageFile');
-    const resizeModeSelect = document.getElementById('resizeMode');
-    const cropGroup = document.getElementById('cropGroup');
-    const cropPctInput = document.getElementById('cropPct');
-    const cropValueDisplay = document.getElementById('cropValueDisplay');
-    
-    const animationSection = document.getElementById('animationSection');
-    const timingChoiceSelect = document.getElementById('timingChoice');
-    const speedGroup = document.getElementById('speedGroup');
-    const form = document.getElementById('generatorForm');
+    // --- UI Interactions (Preview & Sliders) ---
+    const elements = {
+        file: document.getElementById('imageFile'),
+        resize: document.getElementById('resizeMode'),
+        cropGroup: document.getElementById('cropGroup'),
+        cropPct: document.getElementById('cropPct'),
+        cropVal: document.getElementById('cropValueDisplay'),
+        cropLabel: document.getElementById('cropLabel'),
+        animSection: document.getElementById('animationSection'),
+        timing: document.getElementById('timingChoice'),
+        speedGroup: document.getElementById('speedGroup'),
+        speedMult: document.getElementById('speedMultiplier'),
+        previewWrapper: document.getElementById('previewWrapper'),
+        previewImg: document.getElementById('previewImage'),
+        form: document.getElementById('generatorForm'),
+        loading: document.getElementById('loadingOverlay')
+    };
 
-    // 1. Update crop percentage display in real-time
-    cropPctInput.addEventListener('input', (e) => {
-        cropValueDisplay.textContent = `${e.target.value}%`;
-    });
+    let cropDirection = 'horizontal';
 
-    // 2. Toggle Crop Slider based on Resize Method
-    resizeModeSelect.addEventListener('change', (e) => {
-        if (e.target.value === '1') { // "Cut" selected
-            cropGroup.classList.remove('hidden');
-        } else { // "Stretch" selected
-            cropGroup.classList.add('hidden');
+    function updatePreview() {
+        if (!elements.previewImg.src) return;
+        if (elements.resize.value === '1') {
+            elements.previewImg.style.objectFit = 'cover';
+            const pct = elements.cropPct.value + '%';
+            elements.previewImg.style.objectPosition = cropDirection === 'horizontal' ? `${pct} 50%` : `50% ${pct}`;
+        } else {
+            elements.previewImg.style.objectFit = 'fill';
+            elements.previewImg.style.objectPosition = '50% 50%';
         }
-    });
+    }
 
-    // 3. Detect if the uploaded file is a GIF to show animation options
-    imageFileInput.addEventListener('change', (e) => {
+    elements.file.addEventListener('change', (e) => {
         const file = e.target.files[0];
-        if (file && file.type === 'image/gif') {
-            animationSection.classList.remove('hidden');
-        } else {
-            animationSection.classList.add('hidden');
-            // Reset to defaults if they switch back to a static image
-            timingChoiceSelect.value = '1';
-            speedGroup.classList.add('hidden');
+        if (file) {
+            elements.previewWrapper.classList.remove('hidden');
+            elements.previewImg.style.display = 'block';
+            elements.previewImg.src = URL.createObjectURL(file);
+            
+            elements.previewImg.onload = function() {
+                const isWide = (this.naturalWidth / this.naturalHeight) > (300 / 250);
+                cropDirection = isWide ? 'horizontal' : 'vertical';
+                elements.cropLabel.textContent = isWide ? 'Crop Position (Horizontal %)' : 'Crop Position (Vertical %)';
+                elements.cropPct.value = 50;
+                elements.cropVal.textContent = '50%';
+                updatePreview();
+            };
+
+            if (file.type === 'image/gif') {
+                elements.animSection.classList.remove('hidden');
+            } else {
+                elements.animSection.classList.add('hidden');
+                elements.timing.value = '1';
+                elements.speedGroup.classList.add('hidden');
+            }
         }
     });
 
-    // 4. Toggle Custom Speed input based on Timing Choice
-    timingChoiceSelect.addEventListener('change', (e) => {
-        if (e.target.value === '2') { // "Change speed" selected
-            speedGroup.classList.remove('hidden');
-        } else {
-            speedGroup.classList.add('hidden');
-        }
+    elements.cropPct.addEventListener('input', (e) => {
+        elements.cropVal.textContent = `${e.target.value}%`;
+        updatePreview();
     });
 
-    // 5. Handle Form Submission
-    form.addEventListener('submit', (e) => {
-        e.preventDefault(); // Prevent page reload
+    elements.resize.addEventListener('change', (e) => {
+        e.target.value === '1' ? elements.cropGroup.classList.remove('hidden') : elements.cropGroup.classList.add('hidden');
+        updatePreview();
+    });
 
-        // Gather all values exactly as required by the Python script
-        const formData = {
-            file: imageFileInput.files[0]?.name,
-            resize_choice: resizeModeSelect.value,
-            crop_pct: resizeModeSelect.value === '1' ? parseFloat(cropPctInput.value) : null,
-            is_animated: imageFileInput.files[0]?.type === 'image/gif',
-            timing_choice: timingChoiceSelect.value,
-            speed_multiplier: timingChoiceSelect.value === '2' ? parseFloat(document.getElementById('speedMultiplier').value) : 100.0
-        };
+    elements.timing.addEventListener('change', (e) => {
+        e.target.value === '2' ? elements.speedGroup.classList.remove('hidden') : elements.speedGroup.classList.add('hidden');
+    });
 
-        console.log("Data ready for processing:", formData);
+    // --- Core Processing Logic ---
+    function formatDate(date) {
+        return date.toISOString().replace(/[-:T]/g, '').slice(0, 14);
+    }
+
+    async function processCanvasToBlob(canvas, type = "image/jpeg", quality = 0.9) {
+        return new Promise(resolve => canvas.toBlob(resolve, type, quality));
+    }
+
+    // Applies the exact math from the Python script to a Canvas context
+    function drawResizedCropped(sourceCanvas, targetCtx, origW, origH, resizeMode, cropPct) {
+        if (resizeMode === '2') {
+            // Stretch
+            targetCtx.drawImage(sourceCanvas, 0, 0, origW, origH, 0, 0, 300, 250);
+        } else {
+            // Cut
+            const origAspect = origW / origH;
+            const targetAspect = 300 / 250;
+            let drawW, drawH, drawX, drawY;
+
+            if (origAspect > targetAspect) {
+                // Too wide
+                drawH = 250;
+                drawW = origW * (250 / origH);
+                drawX = -(drawW - 300) * (cropPct / 100.0);
+                drawY = 0;
+            } else {
+                // Too tall
+                drawW = 300;
+                drawH = origH * (300 / origW);
+                drawX = 0;
+                drawY = -(drawH - 250) * (cropPct / 100.0);
+            }
+            targetCtx.drawImage(sourceCanvas, 0, 0, origW, origH, drawX, drawY, drawW, drawH);
+        }
+    }
+
+    elements.form.addEventListener('submit', async (e) => {
+        e.preventDefault();
         
-        /* 
-           NEXT STEPS FOR INTEGRATION:
-           Because your Python script relies on the PIL (Pillow) library for frame 
-           extraction, XML generation, and ZIP packaging, you will need to send this 
-           data to a backend. 
-           
-           Example:
-           const data = new FormData();
-           data.append('file', imageFileInput.files[0]);
-           data.append('resize_choice', formData.resize_choice);
-           // ... append other variables ...
-           
-           fetch('/api/generate', { method: 'POST', body: data })
-             .then(response => response.blob())
-             .then(blob => {
-                 // Trigger file download of the ZIP file
-             });
-        */
-        
-        alert("Configuration captured! Check the console to see the JSON payload. (Backend integration required to run the Python script).");
+        const file = elements.file.files[0];
+        if (!file) return;
+
+        elements.loading.classList.remove('hidden');
+
+        try {
+            const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+            const timestamp = formatDate(new Date());
+            const animFolderName = `${baseName}_${timestamp}`;
+            
+            const zip = new JSZip();
+            const rootDir = zip.folder(animFolderName);
+            const dataDir = rootDir.folder("data");
+            const animDir = dataDir.folder("anim");
+
+            const isGif = file.type === 'image/gif';
+            const resizeMode = elements.resize.value;
+            const cropPct = parseFloat(elements.cropPct.value);
+            const speedMultiplier = parseFloat(elements.speedMult.value);
+
+            let framesData = [];
+
+            const targetCanvas = document.createElement('canvas');
+            targetCanvas.width = 300;
+            targetCanvas.height = 250;
+            const targetCtx = targetCanvas.getContext('2d', { willReadFrequently: true });
+
+            if (isGif) {
+                // Read and parse GIF using gifuct-js
+                const arrayBuffer = await file.arrayBuffer();
+                const gif = window.parseGIF(arrayBuffer);
+                const frames = window.decompressFrames(gif, true);
+                
+                const origW = gif.lsd.width;
+                const origH = gif.lsd.height;
+                
+                const gifCanvas = document.createElement('canvas');
+                gifCanvas.width = origW;
+                gifCanvas.height = origH;
+                const gifCtx = gifCanvas.getContext('2d', { willReadFrequently: true });
+                let gifImageData = gifCtx.createImageData(origW, origH);
+
+                for (let i = 0; i < frames.length; i++) {
+                    const frame = frames[i];
+                    
+                    // Render frame patch to ImageData
+                    const patchData = new ImageData(new Uint8ClampedArray(frame.patch), frame.dims.width, frame.dims.height);
+                    
+                    // Temporary canvas for the patch
+                    const patchCanvas = document.createElement('canvas');
+                    patchCanvas.width = frame.dims.width;
+                    patchCanvas.height = frame.dims.height;
+                    patchCanvas.getContext('2d').putImageData(patchData, 0, 0);
+
+                    // Draw patch onto full GIF canvas based on disposal method
+                    if (frame.disposalType === 2) {
+                        gifCtx.clearRect(0, 0, origW, origH);
+                    }
+                    gifCtx.drawImage(patchCanvas, frame.dims.left, frame.dims.top);
+
+                    // Resize/Crop to 300x250
+                    targetCtx.clearRect(0, 0, 300, 250);
+                    drawResizedCropped(gifCanvas, targetCtx, origW, origH, resizeMode, cropPct);
+
+                    // Save icon.png for first frame
+                    if (i === 0) {
+                        const iconBlob = await processCanvasToBlob(targetCanvas, "image/png");
+                        rootDir.file("icon.png", iconBlob);
+                    }
+
+                    // Duration math
+                    let duration = frame.delay || 100;
+                    if (elements.timing.value === '2' && speedMultiplier !== 100) {
+                        duration = Math.max(10, Math.floor(duration * (100.0 / speedMultiplier)));
+                    }
+
+                    // Save Frame Asset
+                    const delaySec = duration / 1000.0;
+                    const frameFilename = `frame_${i.toString().padStart(2, '0')}_delay-${delaySec.toFixed(1)}s.jpg`;
+                    const frameBlob = await processCanvasToBlob(targetCanvas, "image/jpeg", 0.95);
+                    
+                    animDir.file(frameFilename, frameBlob);
+                    
+                    framesData.push({
+                        file: `anim/${frameFilename}`,
+                        area_name: `bg-f${(i + 1).toString().padStart(5, '0')}`,
+                        duration: duration
+                    });
+                }
+            } else {
+                // Static Image handling
+                const img = new Image();
+                img.src = elements.previewImg.src;
+                await new Promise(resolve => img.onload = resolve);
+                
+                targetCtx.clearRect(0, 0, 300, 250);
+                drawResizedCropped(img, targetCtx, img.naturalWidth, img.naturalHeight, resizeMode, cropPct);
+
+                // Save icon.png
+                const iconBlob = await processCanvasToBlob(targetCanvas, "image/png");
+                rootDir.file("icon.png", iconBlob);
+
+                // Save Frame Asset
+                const frameFilename = `frame_00_delay-0.1s.jpg`;
+                const frameBlob = await processCanvasToBlob(targetCanvas, "image/jpeg", 0.95);
+                animDir.file(frameFilename, frameBlob);
+
+                framesData.push({
+                    file: `anim/${frameFilename}`,
+                    area_name: `bg-f00001`,
+                    duration: 100
+                });
+            }
+
+            // --- Generate XML Content (Exact Match to Python Script) ---
+            let xmlContent = `<?xml version="1.0" encoding="UTF-8"?>\n\n<themes>\n`;
+            
+            framesData.forEach(f => {
+                xmlContent += `<images file="${f.file}" filter="nearest">\n`;
+                xmlContent += `    <area name="${f.area_name}" xywh="*"/>\n`;
+                xmlContent += `</images>\n\n`;
+            });
+            
+            xmlContent += `    <images>\n`;
+            xmlContent += `        <animation name="encounter_counter_anim" timeSource="enabled">\n`;
+            framesData.forEach(f => {
+                xmlContent += `  <frame ref="${f.area_name}" duration="${f.duration}"/>\n`;
+            });
+            xmlContent += `        </animation>\n    </images>\n    \n`;
+            
+            xmlContent += `  <theme name="encounter-counter" ref="resizableframe">
+    <param name="titleAreaTop"><int>8</int></param>
+    <param name="titleAreaLeft"><int>11</int></param>
+    <param name="titleAreaRight"><int>-1</int></param>
+    <param name="titleAreaBottom"><int>20</int></param>
+    <param name="border"><border>20,0,0,0</border></param>
+    <param name="background"><image>encounter_counter_anim</image></param>
+    <param name="minWidth"><int>200</int></param>
+    <theme name="content" ref="-defaults">
+      <theme name="label" ref="label">
+        <param name="minWidth"><int>50</int></param>
+        <param name="font"><font>alphabeta-border</font></param>
+        <param name="border"><border>7,7</border></param>
+        <param name="textAlignment"><enum type="alignment">CENTER</enum></param>
+      </theme>
+      <theme name="label-left" ref="label">
+        <param name="textAlignment"><enum type="alignment">LEFT</enum></param>
+      </theme>
+      <theme name="icon" ref="label">
+        <param name="border"><border>7,7</border></param>
+      </theme>
+      <theme name="cell" ref="label">
+        <param name="background"><image>ui-inputbox.background</image></param>
+        <param name="textAlignment"><enum type="alignment">LEFT</enum></param>
+        <param name="border"><border>5</border></param>
+      </theme>
+    </theme>
+  </theme>
+
+   <theme name="encounter-counter-expanded" ref="encounter-counter">
+      <param name="background"><image>encounter_counter_anim</image></param>
+ </theme>
+
+</themes>`;
+
+            dataDir.file("custom-counter.xml", xmlContent);
+
+            const infoXmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<resource name="${baseName}" version="1.0" description="Custom encounter counter - created with enccountergen" author="enccountergen" weblink="https://github.com/cassnadra?tab=repositories">
+  <theme_extensions theme_extension_revision="1">
+    <theme_extension name="${baseName}" path="data/custom-counter.xml" is_mobile="false"/>
+  </theme_extensions>
+</resource>`;
+
+            rootDir.file("info.xml", infoXmlContent);
+
+            // --- Generate and Download ZIP ---
+            const zipBlob = await zip.generateAsync({ type: "blob" });
+            const downloadLink = document.createElement("a");
+            downloadLink.href = URL.createObjectURL(zipBlob);
+            downloadLink.download = `${baseName}.zip`;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+
+            elements.loading.classList.add('hidden');
+
+        } catch (error) {
+            console.error(error);
+            alert("An error occurred while generating the theme. Check the console for details.");
+            elements.loading.classList.add('hidden');
+        }
     });
 </script>
 
