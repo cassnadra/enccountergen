@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BALLSACKEncounter Counter Generator</title>
-    <!-- External Libraries via CDN -->
+    <title>Encounter Counter Generator</title>
+    <!-- JSZip via CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gifuct-js@2.1.2/dist/gifuct-js.min.js"></script>
 
     <style>
         :root {
@@ -123,7 +122,10 @@
     </form>
 </div>
 
-<script>
+<!-- Use ES Module to guarantee imports work cleanly -->
+<script type="module">
+    import { parseGIF, decompressFrames } from 'https://cdn.jsdelivr.net/npm/gifuct-js@2.1.2/+esm';
+
     // --- UI Interactions (Preview & Sliders) ---
     const elements = {
         file: document.getElementById('imageFile'),
@@ -205,25 +207,20 @@
         return new Promise(resolve => canvas.toBlob(resolve, type, quality));
     }
 
-    // Applies the exact math from the Python script to a Canvas context
     function drawResizedCropped(sourceCanvas, targetCtx, origW, origH, resizeMode, cropPct) {
         if (resizeMode === '2') {
-            // Stretch
             targetCtx.drawImage(sourceCanvas, 0, 0, origW, origH, 0, 0, 300, 250);
         } else {
-            // Cut
             const origAspect = origW / origH;
             const targetAspect = 300 / 250;
             let drawW, drawH, drawX, drawY;
 
             if (origAspect > targetAspect) {
-                // Too wide
                 drawH = 250;
                 drawW = origW * (250 / origH);
                 drawX = -(drawW - 300) * (cropPct / 100.0);
                 drawY = 0;
             } else {
-                // Too tall
                 drawW = 300;
                 drawH = origH * (300 / origW);
                 drawX = 0;
@@ -264,10 +261,10 @@
             const targetCtx = targetCanvas.getContext('2d', { willReadFrequently: true });
 
             if (isGif) {
-                // Read and parse GIF using gifuct-js
                 const arrayBuffer = await file.arrayBuffer();
-                const gif = window.parseGIF(arrayBuffer);
-                const frames = window.decompressFrames(gif, true);
+                // We now use the cleanly imported ES Module functions here
+                const gif = parseGIF(arrayBuffer);
+                const frames = decompressFrames(gif, true);
                 
                 const origW = gif.lsd.width;
                 const origH = gif.lsd.height;
@@ -281,38 +278,31 @@
                 for (let i = 0; i < frames.length; i++) {
                     const frame = frames[i];
                     
-                    // Render frame patch to ImageData
                     const patchData = new ImageData(new Uint8ClampedArray(frame.patch), frame.dims.width, frame.dims.height);
                     
-                    // Temporary canvas for the patch
                     const patchCanvas = document.createElement('canvas');
                     patchCanvas.width = frame.dims.width;
                     patchCanvas.height = frame.dims.height;
                     patchCanvas.getContext('2d').putImageData(patchData, 0, 0);
 
-                    // Draw patch onto full GIF canvas based on disposal method
                     if (frame.disposalType === 2) {
                         gifCtx.clearRect(0, 0, origW, origH);
                     }
                     gifCtx.drawImage(patchCanvas, frame.dims.left, frame.dims.top);
 
-                    // Resize/Crop to 300x250
                     targetCtx.clearRect(0, 0, 300, 250);
                     drawResizedCropped(gifCanvas, targetCtx, origW, origH, resizeMode, cropPct);
 
-                    // Save icon.png for first frame
                     if (i === 0) {
                         const iconBlob = await processCanvasToBlob(targetCanvas, "image/png");
                         rootDir.file("icon.png", iconBlob);
                     }
 
-                    // Duration math
                     let duration = frame.delay || 100;
                     if (elements.timing.value === '2' && speedMultiplier !== 100) {
                         duration = Math.max(10, Math.floor(duration * (100.0 / speedMultiplier)));
                     }
 
-                    // Save Frame Asset
                     const delaySec = duration / 1000.0;
                     const frameFilename = `frame_${i.toString().padStart(2, '0')}_delay-${delaySec.toFixed(1)}s.jpg`;
                     const frameBlob = await processCanvasToBlob(targetCanvas, "image/jpeg", 0.95);
@@ -326,7 +316,6 @@
                     });
                 }
             } else {
-                // Static Image handling
                 const img = new Image();
                 img.src = elements.previewImg.src;
                 await new Promise(resolve => img.onload = resolve);
@@ -334,11 +323,9 @@
                 targetCtx.clearRect(0, 0, 300, 250);
                 drawResizedCropped(img, targetCtx, img.naturalWidth, img.naturalHeight, resizeMode, cropPct);
 
-                // Save icon.png
                 const iconBlob = await processCanvasToBlob(targetCanvas, "image/png");
                 rootDir.file("icon.png", iconBlob);
 
-                // Save Frame Asset
                 const frameFilename = `frame_00_delay-0.1s.jpg`;
                 const frameBlob = await processCanvasToBlob(targetCanvas, "image/jpeg", 0.95);
                 animDir.file(frameFilename, frameBlob);
@@ -350,7 +337,7 @@
                 });
             }
 
-            // --- Generate XML Content (Exact Match to Python Script) ---
+            // --- Generate XML Content ---
             let xmlContent = `<?xml version="1.0" encoding="UTF-8"?>\n\n<themes>\n`;
             
             framesData.forEach(f => {
