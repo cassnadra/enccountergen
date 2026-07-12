@@ -9,13 +9,13 @@
 
     <style>
         :root {
-            --primary: #4F46E5;
-            --primary-hover: #4338CA;
-            --bg-color: #F3F4F6;
-            --card-bg: #FFFFFF;
-            --text-main: #1F2937;
+            --primary: #ff00ff;
+            --primary-hover: #dd00dd;
+            --bg-color: #cc88cc;
+            --card-bg: #ff77ff88;
+            --text-main: #ffddff;
             --text-muted: #6B7280;
-            --border-color: #D1D5DB;
+            --border-color: #00eeff;
             --radius: 8px;
         }
 
@@ -98,7 +98,7 @@
         </div>
 
         <div class="form-group" id="cropGroup">
-            <label id="cropLabel" for="cropPct">Crop Position (%)</label>
+            <label id="cropLabel" for="cropPct">Crop Position (Horizontal %)</label>
             <input type="range" id="cropPct" min="0" max="100" value="50" step="0.5">
             <div class="range-value" id="cropValueDisplay">50%</div>
         </div>
@@ -199,10 +199,6 @@
     });
 
     // --- Core Processing Logic ---
-    function formatDate(date) {
-        return date.toISOString().replace(/[-:T]/g, '').slice(0, 14);
-    }
-
     async function processCanvasToBlob(canvas, type = "image/jpeg", quality = 0.9) {
         return new Promise(resolve => canvas.toBlob(resolve, type, quality));
     }
@@ -240,12 +236,10 @@
 
         try {
             const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-            const timestamp = formatDate(new Date());
-            const animFolderName = `${baseName}_${timestamp}`;
             
             const zip = new JSZip();
-            const rootDir = zip.folder(animFolderName);
-            const dataDir = rootDir.folder("data");
+            // Create data/anim directly in the root of the ZIP
+            const dataDir = zip.folder("data");
             const animDir = dataDir.folder("anim");
 
             const isGif = file.type === 'image/gif';
@@ -262,7 +256,6 @@
 
             if (isGif) {
                 const arrayBuffer = await file.arrayBuffer();
-                // We now use the cleanly imported ES Module functions here
                 const gif = parseGIF(arrayBuffer);
                 const frames = decompressFrames(gif, true);
                 
@@ -273,7 +266,6 @@
                 gifCanvas.width = origW;
                 gifCanvas.height = origH;
                 const gifCtx = gifCanvas.getContext('2d', { willReadFrequently: true });
-                let gifImageData = gifCtx.createImageData(origW, origH);
 
                 for (let i = 0; i < frames.length; i++) {
                     const frame = frames[i];
@@ -295,7 +287,7 @@
 
                     if (i === 0) {
                         const iconBlob = await processCanvasToBlob(targetCanvas, "image/png");
-                        rootDir.file("icon.png", iconBlob);
+                        zip.file("icon.png", iconBlob);
                     }
 
                     let duration = frame.delay || 100;
@@ -324,7 +316,7 @@
                 drawResizedCropped(img, targetCtx, img.naturalWidth, img.naturalHeight, resizeMode, cropPct);
 
                 const iconBlob = await processCanvasToBlob(targetCanvas, "image/png");
-                rootDir.file("icon.png", iconBlob);
+                zip.file("icon.png", iconBlob);
 
                 const frameFilename = `frame_00_delay-0.1s.jpg`;
                 const frameBlob = await processCanvasToBlob(targetCanvas, "image/jpeg", 0.95);
@@ -397,7 +389,7 @@
   </theme_extensions>
 </resource>`;
 
-            rootDir.file("info.xml", infoXmlContent);
+            zip.file("info.xml", infoXmlContent);
 
             // --- Generate and Download ZIP ---
             const zipBlob = await zip.generateAsync({ type: "blob" });
