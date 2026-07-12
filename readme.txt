@@ -10,6 +10,7 @@
 
 
 
+!!! now available online! https://cassnadra.github.io/enccountergen/ !!!
 
 simple encounter counter maker i vibecoded in 5 seconds, put a gif into the same 
 folder as enccountergen and input the file name when prompted. the resulting 
