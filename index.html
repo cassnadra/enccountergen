@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encounter Counter Generator</title>
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --bg-color: #F3F4F6;
+            --card-bg: #FFFFFF;
+            --text-main: #1F2937;
+            --text-muted: #6B7280;
+            --border-color: #D1D5DB;
+            --radius: 8px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            padding: 30px;
+            border-radius: var(--radius);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 1.5rem;
+            color: var(--text-main);
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .help-text {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: -4px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        input[type="file"], select, input[type="number"], input[type="range"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+
+        input[type="range"] {
+            padding: 0;
+        }
+
+        .range-value {
+            text-align: center;
+            font-weight: bold;
+            margin-top: 5px;
+            font-size: 0.9rem;
+            color: var(--primary);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        button {
+            width: 100%;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Encounter Counter Generator</h1>
+    
+    <form id="generatorForm">
+        <!-- File Upload -->
+        <div class="form-group">
+            <label for="imageFile">Upload GIF or Image</label>
+            <span class="help-text">Image will be normalized to 300x250.</span>
+            <input type="file" id="imageFile" accept="image/png, image/jpeg, image/gif" required>
+        </div>
+
+        <!-- Resize Handling -->
+        <div class="form-group" id="resizeGroup">
+            <label for="resizeMode">Resize Method</label>
+            <select id="resizeMode">
+                <option value="1">Cut (Scale and customize crop position)</option>
+                <option value="2">Stretch (Force resize directly to 300x250)</option>
+            </select>
+        </div>
+
+        <!-- Crop Percentage (Hidden if Stretch is selected) -->
+        <div class="form-group" id="cropGroup">
+            <label for="cropPct">Crop Position (%)</label>
+            <span class="help-text">0 = Left/Top edge, 50 = Center, 100 = Right/Bottom edge.</span>
+            <input type="range" id="cropPct" min="0" max="100" value="50" step="0.5">
+            <div class="range-value" id="cropValueDisplay">50%</div>
+        </div>
+
+        <!-- Animation Section (Hidden unless GIF is uploaded) -->
+        <div id="animationSection" class="hidden">
+            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 20px 0;">
+            
+            <div class="form-group">
+                <label for="timingChoice">Frame Timing (Animation Speed)</label>
+                <select id="timingChoice">
+                    <option value="1">Play at normal speed</option>
+                    <option value="2">Change speed by arbitrary %</option>
+                </select>
+            </div>
+
+            <!-- Custom Speed (Hidden unless "Change speed" is selected) -->
+            <div class="form-group hidden" id="speedGroup">
+                <label for="speedMultiplier">Speed Percentage (%)</label>
+                <span class="help-text">e.g., 50 = half speed, 200 = double speed.</span>
+                <input type="number" id="speedMultiplier" value="100" min="1" step="1">
+            </div>
+        </div>
+
+        <button type="submit">Generate Theme</button>
+    </form>
+</div>
+
+<script>
+    // DOM Elements
+    const imageFileInput = document.getElementById('imageFile');
+    const resizeModeSelect = document.getElementById('resizeMode');
+    const cropGroup = document.getElementById('cropGroup');
+    const cropPctInput = document.getElementById('cropPct');
+    const cropValueDisplay = document.getElementById('cropValueDisplay');
+    
+    const animationSection = document.getElementById('animationSection');
+    const timingChoiceSelect = document.getElementById('timingChoice');
+    const speedGroup = document.getElementById('speedGroup');
+    const form = document.getElementById('generatorForm');
+
+    // 1. Update crop percentage display in real-time
+    cropPctInput.addEventListener('input', (e) => {
+        cropValueDisplay.textContent = `${e.target.value}%`;
+    });
+
+    // 2. Toggle Crop Slider based on Resize Method
+    resizeModeSelect.addEventListener('change', (e) => {
+        if (e.target.value === '1') { // "Cut" selected
+            cropGroup.classList.remove('hidden');
+        } else { // "Stretch" selected
+            cropGroup.classList.add('hidden');
+        }
+    });
+
+    // 3. Detect if the uploaded file is a GIF to show animation options
+    imageFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file && file.type === 'image/gif') {
+            animationSection.classList.remove('hidden');
+        } else {
+            animationSection.classList.add('hidden');
+            // Reset to defaults if they switch back to a static image
+            timingChoiceSelect.value = '1';
+            speedGroup.classList.add('hidden');
+        }
+    });
+
+    // 4. Toggle Custom Speed input based on Timing Choice
+    timingChoiceSelect.addEventListener('change', (e) => {
+        if (e.target.value === '2') { // "Change speed" selected
+            speedGroup.classList.remove('hidden');
+        } else {
+            speedGroup.classList.add('hidden');
+        }
+    });
+
+    // 5. Handle Form Submission
+    form.addEventListener('submit', (e) => {
+        e.preventDefault(); // Prevent page reload
+
+        // Gather all values exactly as required by the Python script
+        const formData = {
+            file: imageFileInput.files[0]?.name,
+            resize_choice: resizeModeSelect.value,
+            crop_pct: resizeModeSelect.value === '1' ? parseFloat(cropPctInput.value) : null,
+            is_animated: imageFileInput.files[0]?.type === 'image/gif',
+            timing_choice: timingChoiceSelect.value,
+            speed_multiplier: timingChoiceSelect.value === '2' ? parseFloat(document.getElementById('speedMultiplier').value) : 100.0
+        };
+
+        console.log("Data ready for processing:", formData);
+        
+        /* 
+           NEXT STEPS FOR INTEGRATION:
+           Because your Python script relies on the PIL (Pillow) library for frame 
+           extraction, XML generation, and ZIP packaging, you will need to send this 
+           data to a backend. 
+           
+           Example:
+           const data = new FormData();
+           data.append('file', imageFileInput.files[0]);
+           data.append('resize_choice', formData.resize_choice);
+           // ... append other variables ...
+           
+           fetch('/api/generate', { method: 'POST', body: data })
+             .then(response => response.blob())
+             .then(blob => {
+                 // Trigger file download of the ZIP file
+             });
+        */
+        
+        alert("Configuration captured! Check the console to see the JSON payload. (Backend integration required to run the Python script).");
+    });
+</script>
+
+</body>
+</html>
